@@ -34,6 +34,7 @@
         "drupal/google_analytics": "^4.0",
         "drupal/google_tag": "^2.0",
         "drupal/link_attributes": "^1.13",
+        "drupal/menu_item_extras": "^3.0",
         "drupal/metatag": "^1.25",
         "drupal/paragraphs": "^1.15",
         "drupal/rebuild_cache_access": "^1.8",
@@ -41,6 +42,7 @@
         "drupal/twig_tools": "^2.0",
         "drupal/twig_tweak": "^3.2",
         "drupal/twig_vardumper": "^3.1",
+        "drupal/user_prune": "^1.4",
         "drupal/views_bulk_operations": "^4.2",
         "drush/drush": "^12.1"
     },
