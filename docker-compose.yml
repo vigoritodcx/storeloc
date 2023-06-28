@@ -11,14 +11,12 @@ services:
       - ./.etc/conf/apache/vhosts:/etc/apache2/sites-enabled
       - ./.etc/conf/php/90-overrides.ini:/usr/local/etc/php/conf.d/90-overrides.ini
       - ./log:/var/log/apache2
-    env_file:
-      - ./.env
     restart: unless-stopped
   db:
     image: mariadb
     environment:
       MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: nuovilidi
+      MYSQL_DATABASE: apsl
       MYSQL_USER: admin
       MYSQL_PASSWORD: 1234
     volumes:
