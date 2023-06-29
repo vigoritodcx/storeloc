@@ -1,0 +1,10 @@
+uuid: 45d35686-762b-472c-991a-190750549b7f
+langcode: en
+status: true
+dependencies: {  }
+id: store_locator
+label: store_locator
+description: ''
+source_type: null
+module: null
+shared_configuration: null

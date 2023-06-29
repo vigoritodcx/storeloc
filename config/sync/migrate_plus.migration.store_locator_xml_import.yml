@@ -1,0 +1,200 @@
+uuid: 6ffd9ed0-fbd4-4d78-b1cb-729ab54d9f11
+langcode: en
+status: true
+dependencies: {  }
+id: store_locator_xml_import
+class: null
+field_plugin_method: null
+cck_plugin_method: null
+migration_tags: null
+migration_group: store_locator
+label: 'Import stores from XML'
+source:
+  plugin: url
+  track_changes: true
+  data_fetcher_plugin: http
+  data_parser_plugin: xml
+  urls: 'public://CRM-retailer.xml'
+  response_type: xml
+  item_selector: /ArrayOfCustomer/Customer
+  fields:
+    -
+      name: store_name
+      label: 'Store Name'
+      selector: Company
+    -
+      name: email
+      label: Email
+      selector: Email
+    -
+      name: contact_name
+      label: 'Contact Name'
+      selector: ContactName
+    -
+      name: company
+      label: Company
+      selector: Company
+    -
+      name: phone
+      label: Phone
+      selector: Phone
+    -
+      name: field_codfiscale
+      label: 'Codice Fiscale'
+      selector: CodFiscale
+    -
+      name: field_active
+      label: Active
+      selector: Active
+    -
+      name: nazione
+      label: Nazione
+      selector: Nazione
+    -
+      name: indirizzo
+      label: Indirizzo
+      selector: Indirizzo
+    -
+      name: cap
+      label: Cap
+      selector: Cap
+    -
+      name: localita
+      label: Localita
+      selector: Localita
+    -
+      name: provincia
+      label: Provincia
+      selector: Provincia
+    -
+      name: crossbrandid
+      label: CrossBrandID
+      selector: CrossBrandID
+    -
+      name: brandid
+      label: BrandID
+      selector: BrandID
+    -
+      name: apparecchiature
+      label: Apparecchiature
+      selector: Apparecchiature
+    -
+      name: field_customerid
+      label: CustomerID
+      selector: CustomerID
+    -
+      name: field_notes
+      label: Notes
+      selector: Notes
+    -
+      name: field_categoriacont
+      label: CategoriaCont
+      selector: CategoriaCont
+    -
+      name: field_vatregistrationid
+      label: VATRegistrationID
+      selector: VATRegistrationID
+    -
+      name: field_prodotto
+      label: 'Product taxonomy'
+      selector: products
+  ids:
+    field_customerid:
+      type: string
+process:
+  title: store_name
+  field_email: email
+  field_contact_name: contact_name
+  field_company: company
+  field_phone: phone
+  field_notes: field_notes
+  field_codfiscale: field_codfiscale
+  field_customerid: field_customerid
+  field_vatregistrationid: field_vatregistrationid
+  field_indirizzo/country_code: nazione
+  field_indirizzo/administrative_area: provincia
+  field_indirizzo/locality: localita
+  field_indirizzo/address_line1: indirizzo
+  field_indirizzo/address_line2:
+    plugin: default_value
+    default_value: ''
+  field_indirizzo/postal_code: cap
+  field_brandid:
+    -
+      plugin: explode
+      source: crossbrandid
+      delimiter: '||'
+    -
+      plugin: entity_lookup
+      bundle_key: vid
+      bundle: brand
+      value_key: field_codice_identificativo
+      entity_type: taxonomy_term
+  field_main_brandid:
+    plugin: entity_lookup
+    source: brandid
+    value_key: field_codice_identificativo
+    entity_type: taxonomy_term
+    bundle: brand
+    bundle_key: vid
+  field_apparecchiature:
+    -
+      plugin: explode
+      source: apparecchiature
+      delimiter: '||'
+    -
+      plugin: entity_lookup
+      bundle_key: vid
+      bundle: tecnologia_apparecchiature
+      value_key: field_ci_ta
+      entity_type: taxonomy_term
+  field_prodotto:
+    -
+      plugin: explode
+      source: field_prodotto
+      delimiter: '||'
+    -
+      plugin: entity_lookup
+      bundle_key: vid
+      bundle: product
+      value_key: field_codice_identificativo
+      entity_type: taxonomy_term
+  field_categoriacont:
+    -
+      plugin: explode
+      source: field_categoriacont
+      delimiter: '||'
+    -
+      plugin: entity_lookup
+      bundle_key: vid
+      bundle: circuito_boutique
+      value_key: field_ci_cb
+      entity_type: taxonomy_term
+  status: field_active
+  field_csv_sap:
+    plugin: default_value
+    default_value: 0
+destination:
+  plugin: 'entity:node'
+  default_bundle: store
+  overwrite_properties:
+    - title
+    - status
+    - field_email
+    - field_brandid
+    - field_main_brandid
+    - field_notes
+    - field_contact_name
+    - field_company
+    - field_phone
+    - field_codfiscale
+    - field_indirizzo/country_code
+    - field_indirizzo/administrative_area
+    - field_indirizzo/locality
+    - field_indirizzo/address_line1
+    - field_indirizzo/address_line2
+    - field_indirizzo/postal_code
+    - field_apparecchiature
+    - field_categoriacont
+    - field_prodotto
+migration_dependencies: null
