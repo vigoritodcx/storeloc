@@ -1,0 +1,14 @@
+store_locator.maps:
+   version: 1.x
+   css:
+       layout:
+         css/store-locator.css: { scope: footer }
+         https://pro.fontawesome.com/releases/v5.0.13/css/all.css: { type: external }
+   js:
+     js/maps.js: { scope: footer }
+     js/locator.js: { scope: footer }
+   dependencies:
+         - core/drupal
+         - core/jquery
+         - core/underscore
+         - core/drupalSettings

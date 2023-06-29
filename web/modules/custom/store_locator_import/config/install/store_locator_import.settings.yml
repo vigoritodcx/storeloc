@@ -1,0 +1,5 @@
+wsinfo:
+  host: 'http://ws.alfaworld.net'
+  basepath: '/InterfacceCRM'
+  username: ''
+  password: ''

@@ -1,0 +1,40 @@
+store_locator_import.export_form:
+  route_name: store_locator_import.export_form
+  base_route: store_locator_import.export_form
+  title: 'Export stores'
+
+store_locator_import.import_csv:
+  route_name: store_locator_import.import_csv_form
+  base_route: store_locator_import.export_form
+  title: 'Import stores CSV'
+
+store_locator_import.sync_sap:
+  route_name: store_locator_import.sync_sap_form
+  base_route: store_locator_import.export_form
+  title: 'Sync stores SAP'
+
+store_locator_import.force_save_node_form:
+  route_name: store_locator_import.force_node_save_form
+  base_route: store_locator_import.export_form
+  title: 'Force Update'
+
+store_locator_import.settings_form:
+  route_name: store_locator_import.settings_form
+  base_route: store_locator_import.export_form
+  title: 'Configure Store Locator Import'
+
+store_locator_import.delte_stores_form:
+  route_name: store_locator_import.delte_stores_form
+  base_route: store_locator_import.export_form
+  title: 'Delete Stores'
+
+# these are used for testing purposes
+#store_locator_import.store_locator.sync:
+#  route_name: store_locator_import.import_xml_form
+#  base_route: store_locator_import.export_form
+#  title: 'Import stores XML'
+#
+#store_locator_import.store_locator_old_xml:
+#  route_name: store_locator_import.import_old_xml_form
+#  base_route: store_locator_import.export_form
+#  title: 'Import stores from old XML'

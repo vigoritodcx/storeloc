@@ -1,0 +1,22 @@
+services:
+  store_locator.service.configuration:
+    class: Drupal\store_locator\Service\MapConfigurationService
+    arguments: ['@entity_field.manager']
+  store_locator.path_processor.store_path:
+    class: Drupal\store_locator\Processor\StorePathProcessor
+    tags:
+      - { name: path_processor_inbound, priority: 250 }
+  store_locator.subscriber.handle_request:
+    class: Drupal\store_locator\EventSubscriber\HandleStoreRequest
+    arguments: ['@store_locator.service.configuration']
+    tags:
+      - { name: event_subscriber }
+  store_locator.theme_negotiator.negotiator:
+    class: Drupal\store_locator\Theme\Negotiator
+    tags:
+    - { name: theme_negotiator, priority: 10 }
+  remove_x_frame_options_subscriber:
+    class: Drupal\store_locator\EventSubscriber\RemoveXFrameOptionsSubscriber
+    tags:
+    - { name: event_subscriber }
+

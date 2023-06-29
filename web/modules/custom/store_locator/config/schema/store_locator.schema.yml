@@ -1,0 +1,7 @@
+field.formatter.settings.content_field:
+  type: mapping
+  label: 'FORMATTER NAME text length'
+  mapping:
+    view_mode:
+      type: string
+      label: 'Text Length'

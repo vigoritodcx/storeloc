@@ -1,0 +1,56 @@
+store_locator_import.import_xml_form:
+  path: '/admin/config/system/store-locator-import/importXML'
+  defaults:
+    _form: '\Drupal\store_locator_import\Form\ImportXMLForm'
+    _title: 'Store Locator Import XML'
+  requirements:
+    _permission: 'store locator import'
+store_locator_import.import_old_xml_form:
+  path: '/admin/config/system/store-locator-import/importOldXML'
+  defaults:
+    _form: '\Drupal\store_locator_import\Form\ImportOldXMLForm'
+    _title: 'Store Locator Import old XML'
+  requirements:
+    _permission: 'store locator import'
+store_locator_import.sync_sap_form:
+  path: '/admin/config/system/store-locator-import/syncSAP'
+  defaults:
+    _form: '\Drupal\store_locator_import\Form\SyncSAPForm'
+    _title: 'Store Locator Sync SAP'
+  requirements:
+    _permission: 'store locator sync sap'
+store_locator_import.import_csv_form:
+  path: '/admin/config/system/store-locator-import/importCSV'
+  defaults:
+    _form: '\Drupal\store_locator_import\Form\ImportCSVForm'
+    _title: 'Store Locator Import CSV'
+  requirements:
+    _permission: 'store locator import'
+store_locator_import.export_form:
+  path: '/admin/config/system/store-locator-import/exportStore'
+  defaults:
+    _form: '\Drupal\store_locator_import\Form\ExportForm'
+    _title: 'Store Locator Export'
+  requirements:
+    _permission: 'store locator export'
+store_locator_import.force_node_save_form:
+  path: '/admin/config/system/store-locator-import/force-node-save'
+  defaults:
+    _form: '\Drupal\store_locator_import\Form\ForceNodeSaveForm'
+    _title: 'Force Node resave'
+  requirements:
+    _permission: 'administer site'
+store_locator_import.settings_form:
+  path: '/admin/config/system/store-locator-import/settings'
+  defaults:
+    _title: 'Store locator import Settings'
+    _form: '\Drupal\store_locator_import\Form\WSSettingsForm'
+  requirements:
+    _permission: 'access store locator import settings'
+store_locator_import.delte_stores_form:
+  path: '/admin/config/system/store-locator-import/delete-stores'
+  defaults:
+    _title: 'Delete Stores'
+    _form: '\Drupal\store_locator_import\Form\DeleteStoresForm'
+  requirements:
+    _permission: 'delete stores by import type'

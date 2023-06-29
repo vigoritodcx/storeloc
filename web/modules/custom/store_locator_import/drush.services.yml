@@ -1,0 +1,5 @@
+services:
+  store_locator_import.commands:
+    class: \Drupal\store_locator_import\Commands\StoreLocatorImportCommands
+    tags:
+      - { name: drush.command }

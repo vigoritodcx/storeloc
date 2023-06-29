@@ -1,0 +1,474 @@
+<?php
+
+/**
+ * @file
+ * Contains store_locator_import.module.
+ */
+
+use Drupal\Core\Routing\RouteMatchInterface;
+use Drupal\store_locator_import\Service\UserCountryService;
+
+/**
+ * Implements hook_ENTITY_TYPE_delete().
+ */
+function store_locator_import_node_delete(Drupal\Core\Entity\EntityInterface $entity)
+{
+    if ($entity->bundle() == 'store') {
+        \Drupal::database()->delete('migrate_map_store_locator_csv_import')
+            ->condition('destid1', $entity->id())
+            ->execute();
+    }
+}
+
+/**
+ * Implements hook_cron().
+ */
+function store_locator_import_cron()
+{
+    \Drupal::database()->delete('migrate_map_store_locator_csv_import')
+        ->isNull('destid1')
+        ->execute();
+}
+
+/**
+ * Implements hook_help().
+ */
+function store_locator_import_help($route_name, RouteMatchInterface $route_match) {
+  switch ($route_name) {
+    // Main module help for the store_locator_import module.
+    case 'help.page.store_locator_import':
+      $output = '';
+      $output .= '<h3>' . t('About') . '</h3>';
+      $output .= '<p>' . t('Import module') . '</p>';
+      return $output;
+
+    default:
+  }
+}
+
+/**
+ * Implements hook_views_pre_render().
+ */
+function store_locator_import_views_pre_render(\Drupal\views\ViewExecutable $view) {
+  if ($view->id() === 'csv_export' && $view->current_display === 'data_export_1' || $view->current_display === 'data_export_2' ) {
+    foreach ( $view->result as $key => $value ) {
+      $node = $value->_entity;
+      sti_set_field($node, 'field_brandid', 'field_empty1');
+      sti_set_field($node, 'field_categoriacont', 'field_empty2', 'field_ci_cb');
+      sti_set_field($node, 'field_apparecchiature', 'field_empty3', 'field_ci_ta');
+      sti_set_field($node, 'field_prodotto', 'field_empty4');
+    }
+  }
+}
+
+function sti_set_field(&$node, $field, $emtpy_field, $codice = 'field_codice_identificativo') {
+  /** @var \Drupal\node\Entity\Node $node */
+  /** @var \Drupal\Core\Field\FieldItemList $list*/
+  $main_brand_ids = $node->get($field)->getValue();
+  $tax_codes = [];
+  static $taxonomy_terms;
+  if ( is_null($taxonomy_terms) ) {
+    $taxonomy_terms = \Drupal::entityTypeManager()->getStorage('taxonomy_term')->loadMultiple();
+  }
+  foreach ($main_brand_ids as $key => $value) {
+    $taxonomy_term = $taxonomy_terms[$value['target_id']];
+    $listItem = ( $taxonomy_term ) ? $taxonomy_term->get($codice) : null;
+    $item_value = ( $listItem ) ? $listItem->getValue() : null;
+    if ( $item_value ) {
+      $tax_codes[] = $item_value[0]['value'];
+    }
+  }
+  $node->set($emtpy_field, ['value' => implode('#', $tax_codes)]);
+}
+
+function store_locator_import_migrate_store_locator_csv_import_prepare_row(\Drupal\migrate\Row $row, \Drupal\migrate\Plugin\MigrateSourceInterface $source, \Drupal\migrate\Plugin\MigrationInterface $migration)
+{
+
+    $countrySelected = $migration->getSourceConfiguration()['checkCountry'];
+    $countryImported = $row->getSourceProperty('CountryCode');
+
+    $brandSelected = $migration->getSourceConfiguration()['brand'];
+    $brandImported = $row->getSourceProperty('BrandID');
+
+
+    $generatedId = uniqid('CSV-' . $countryImported . '-' . $brandImported . '-' );
+    $row->setSourceProperty('CustomerNumber', $generatedId);
+    $row->setSourceProperty('CustomerID', $generatedId);
+
+
+    if ($countryImported != $countrySelected || $brandSelected != $brandImported ) {
+        $message = sprintf('Country selected %s is different from country in the source %s', $countrySelected, $countryImported);
+        throw new \Drupal\migrate\MigrateSkipRowException($message);
+    }
+
+    /*$source_published_status = $row->getSourceProperty('Active');
+    $node_published_status = ($source_published_status === 'online') ? 1 : 0;
+    $row->setSourceProperty('Active', $node_published_status);*/
+}
+
+/**
+ * @param \Drupal\migrate\Row $row
+ * @param \Drupal\migrate\Plugin\MigrateSourceInterface $source
+ * @param \Drupal\migrate\Plugin\MigrationInterface $migration
+ * @TODO: Remove this on new XML import
+ */
+function store_locator_import_migrate_store_locator_xml_import_prepare_row(\Drupal\migrate\Row $row, \Drupal\migrate\Plugin\MigrateSourceInterface $source, \Drupal\migrate\Plugin\MigrationInterface $migration)
+{
+  $source_nazione = $row->getSourceProperty('nazione');
+  $new_nazione = null;
+  switch($source_nazione) {
+    case 'ITA':
+      $new_nazione = 'IT';
+      break;
+  }
+  ($new_nazione) ? $row->setSourceProperty('nazione', $new_nazione) : null;
+}
+
+function store_locator_import_migrate_brands_xml_import_prepare_row(\Drupal\migrate\Row $row, \Drupal\migrate\Plugin\MigrateSourceInterface $source, \Drupal\migrate\Plugin\MigrationInterface $migration)
+{
+
+}
+
+/**
+ * Implements hook_user_login().
+ */
+function store_locator_import_user_login($account)
+{
+    /* @var Drupal\user\Entity\User $account*/
+    $roles = $account->getRoles();
+    if ( in_array('local', $roles) ) {
+        $response = new Symfony\Component\HttpFoundation\RedirectResponse(\Drupal\Core\Url::fromUri('internal:/admin/importCSV')->toString());
+        $response->send();
+        return;
+    }
+}
+
+
+/**
+ * @param $entity_type
+ * @param $bundle
+ * @param int $limit
+ * @example sli_bulkDelete('node', 'store');
+ */
+function sli_bulkDelete($entity_type, $bundle, $country, $limit = 25)
+{
+    $batch = [
+        'title' => t('Updating all $country @bundle',
+            ['@entity_type' => $entity_type, '@bundle' => $bundle,]),
+        'operations' => [
+            ['sli_delete', [$entity_type, $bundle, $limit, $country]],
+        ],
+        'finished' => 'sli_finish',
+    ];
+
+    batch_set($batch);
+}
+
+/**
+ * @param $entity_type
+ * @param $bundle
+ * @param int $limit
+ * @example sli_bulkGetCoordinates();
+ */
+function sli_bulkGetCoordinates($limit = 25)
+{
+    $batch = [
+        'title' => t('Save store nodes to get coordinates'),
+        'operations' => [
+            ['sli_relocate', [$limit]],
+        ],
+    ];
+
+    batch_set($batch);
+}
+
+function sli_delete($entity_type, $bundle, $limit = 25, $countryStores, $brand,$fileUri,&$context)
+{
+    if (empty($context['sandbox'])) {
+        $context['sandbox']['progress'] = 0;
+        $context['sandbox']['current_id'] = 0;
+        $context['sandbox']['max'] = sli_getEntitiesCount($entity_type, $bundle, $countryStores, $brand);
+        $context['sandbox']['progress'] = 0;
+    }
+    $context['results'] = [
+      'entity_type' => $entity_type,
+      'bundle' => $bundle,
+      'limit' => $limit,
+      'brand' => $brand,
+      'fileUri' => $fileUri,
+      'countryStores' => $countryStores,
+      ];
+    $nids = sli_getEntities($entity_type, $bundle, $countryStores, $brand, $limit);
+    $entities = \Drupal::service('entity_type.manager')
+      ->getStorage($entity_type)
+      ->loadMultiple($nids);
+
+    $result = sli_deleteEntites($entity_type, $entities);
+    $context['sandbox']['progress'] += $result;
+    $context['message'] = 'deleted ' . ($context['sandbox']['progress']) . ' nodes';
+    $context['finished'] = empty($result) || $context['sandbox']['max'] <= $context['sandbox']['progress'];
+}
+
+function sli_deleteByDate($entity_type, $bundle, $limit = 25, $timestamp, &$context)
+{
+  if (empty($context['sandbox'])) {
+    $context['sandbox']['progress'] = 0;
+    $context['sandbox']['current_id'] = 0;
+    $context['sandbox']['max'] = sli_getEntitiesCountByDate($entity_type, $bundle, $timestamp);
+    $context['sandbox']['progress'] = 0;
+  }
+  $context['results'] = [
+    'entity_type' => $entity_type,
+    'bundle' => $bundle,
+    'limit' => $limit,
+  ];
+  $nids = sli_getEntitiesByBeforeDate($entity_type, $bundle, $timestamp, $limit);
+  $entities = \Drupal::service('entity_type.manager')
+    ->getStorage($entity_type)
+    ->loadMultiple($nids);
+
+  $result = sli_deleteEntites($entity_type, $entities);
+  $context['sandbox']['progress'] += $result;
+  $context['message'] = 'deleted ' . ($context['sandbox']['progress']) . ' nodes';
+  $context['finished'] = empty($result) || $context['sandbox']['max'] <= $context['sandbox']['progress'];
+}
+
+function sli_relocate($limit = 25, &$context)
+{
+    $entity_type = 'node';
+    $bundle = 'store';
+    if (empty($context['sandbox'])) {
+        $context['sandbox']['progress'] = 0;
+        $context['sandbox']['current_id'] = 0;
+        $context['sandbox']['max'] = sli_getAllEntitiesCount($entity_type, $bundle);
+    }
+    $nids = sli_getAllEntities($entity_type, $bundle, $limit, $context['sandbox']['progress']);
+    $entities = \Drupal::service('entity_type.manager')->getStorage($entity_type)->loadMultiple($nids);
+    $result = sli_updateEntites($entities);
+    $context['sandbox']['progress'] += $result;
+    $context['message'] = 'Updated ' . ($context['sandbox']['progress']) . ' nodes';
+    $context['finished'] = empty($result) || $context['sandbox']['max'] <= $context['sandbox']['progress'];
+}
+
+/**
+ * @param $success
+ * @param array $results
+ * @param array $operations
+ */
+function sli_finish($success, array $results, array $operations)
+{
+      drupal_flush_all_caches();
+}
+
+
+function sli_startImportCSV ( $limit = 25, $countryStores, $brand,$fileUri, &$context) {
+
+    \Drupal::logger('store_locator_import', 'finished delete batch');
+
+    /** @var \Drupal\migrate\Plugin\Migration $migration*/
+    $migration = \Drupal::service('plugin.manager.migration')->createInstance('store_locator_csv_import');
+
+    $options = [
+      'initMigrationOverride' => [
+        'source' => [
+          'path' => $fileUri,
+          'checkCountry' => $countryStores,
+          'brand' => $brand,
+          ],
+        'itemsLimit' => $limit,
+
+        ],
+      ];
+
+    $executable = new \Drupal\store_locator_import\Batch\StoreLocatorMigrateCsvBatchExecutable($migration, new \Drupal\migrate\MigrateMessage(), $options);
+    $executable->batchImport();
+}
+
+function sli_startImportXML ( $limit = 25, $fileUri, &$context) {
+
+    /** @var \Drupal\migrate\Plugin\Migration $migration*/
+    $migration = \Drupal::service('plugin.manager.migration')
+      ->createInstance('store_locator_xml_import');
+
+    $options = [
+      'initMigrationOverride' => [
+        'source' => [
+          'urls' => $fileUri,
+          ],
+        'itemsLimit' => $limit,
+        ],
+        'update' => true
+      ];
+
+    $executable = new \Drupal\store_locator_import\Batch\StoreLocatorMigrateBatchExecutable($migration, new \Drupal\migrate\MigrateMessage(), $options);
+    $executable->batchImport();
+}
+
+function sli_startImportOldXML ( $limit = 25, $fileUri, &$context) {
+
+  \Drupal::logger('store_locator_old_import', 'finished delete batch');
+
+  /** @var \Drupal\migrate\Plugin\Migration $migration*/
+  $migration = \Drupal::service('plugin.manager.migration')->createInstance('store_locator_old_xml_import');
+  $options = [
+    'initMigrationOverride' => [
+      'source' => [
+        'urls' => $fileUri,
+      ],
+      'itemsLimit' => $limit,
+    ],
+    'update' => true
+  ];
+
+  $executable = new \Drupal\store_locator_import\Batch\StoreLocatorMigrateBatchExecutable($migration, new \Drupal\migrate\MigrateMessage(), $options);
+  $executable->batchImport();
+}
+
+function sli_getEntities($entity_type, $bundle, $countryStores, $brand, $limit = 25, $offset = 0)
+{
+    $nids = \Drupal::service('entity_type.manager')->getStorage($entity_type)
+        ->getQuery()
+        ->condition('type', $bundle)
+        ->condition('field_customerid', 'CSV-'. $countryStores . '-' . $brand, 'CONTAINS')
+        ->range($offset, $limit)
+        ->execute();
+
+    return $nids;
+}
+
+function sli_getEntitiesByBeforeDate($entity_type, $bundle, $timestamp, $limit=50, $offset=0)
+{
+  /** @var Drupal\core\Entity\Query\Sql\Query $query */
+    $query = \Drupal::service('entity_type.manager')->getStorage($entity_type)
+    ->getQuery()
+    ->condition('type', $bundle)
+    ->condition('field_customerid', '%CSV%', 'NOT LIKE')
+    ->condition('created', $timestamp, '<')
+    ->range($offset, $limit);
+
+    $nids = $query->execute();
+
+  return $nids;
+}
+
+function sli_getEntitiesCount($entity_type, $bundle, $countryStores, $brand)
+{
+    $number = \Drupal::service('entity_type.manager')->getStorage($entity_type)
+        ->getQuery()
+        ->condition('type', $bundle)
+        ->condition('field_customerid', 'CSV-'. $countryStores . '-' . $brand, 'CONTAINS')
+        ->count()
+        ->execute();
+
+    return $number;
+}
+
+function sli_getEntitiesCountByDate($entity_type, $bundle, $timestamp)
+{
+  $query = \Drupal::service('entity_type.manager')->getStorage($entity_type)
+    ->getQuery()
+    ->condition('type', $bundle)
+    ->condition('field_customerid', '%CSV%', 'NOT LIKE')
+    ->condition('created', $timestamp, '<')
+    ->count();
+
+  $number = $query->execute();
+
+  return $number;
+}
+
+/**
+ * @param $entity_type
+ * @param $nids
+ * @return mixed
+ * @TODO: EntityStorageException
+ */
+function sli_deleteEntites($entity_type, $entities)
+{
+    \Drupal::service('entity_type.manager')
+        ->getStorage($entity_type)
+        ->delete($entities);
+    return count($entities);
+}
+
+/**
+ * @param $entity_type
+ * @param $conditions
+ * @param int $limit
+ * @param int $offset
+ * @return \Drupal\Core\Entity\Query\QueryInterface
+ */
+function sli_prepareEntityQuery($entity_type, $conditions, $limit = null, $offset = null) {
+    /** @var \Drupal\Core\Entity\Query\QueryInterface $query */
+    $query = \Drupal::service('entity_type.manager')->getStorage($entity_type)
+        ->getQuery();
+    if (!is_null($limit)) {
+        $offset ?: 0;
+        $query->range($offset, $limit);
+    }
+    foreach ($conditions as $field => $value) {
+        $query->condition($field, $value);
+    }
+    return clone $query;
+}
+
+function sli_getAllEntities($entity_type, $bundle, $limit = 25, $offset = 0)
+{
+    $conditions = [
+        'type' => $bundle,
+    ];
+    $nids = sli_prepareEntityQuery($entity_type, $conditions, $limit, $offset)
+        ->execute();
+
+    return $nids;
+}
+
+function sli_getAllEntitiesCount($entity_type, $bundle)
+{
+    $conditions = [
+        'type' => $bundle,
+    ];
+    $nids = sli_prepareEntityQuery($entity_type, $conditions)
+        ->count()
+        ->execute();
+
+    return $nids;
+}
+
+
+function sli_updateEntites($entities) {
+    $i = 0;
+    /** @var \Drupal\node\Entity\Node $entity */
+    foreach ($entities as $entity) {
+        $entity->save();
+        $i++;
+    }
+
+    return $i;
+}
+
+function sli_get_migration_timestamp(string $table) {
+    $connection = \Drupal::database();
+    $query = $connection->select($table, 'migration_table');
+    $query->range(0,1);
+    $query->addExpression('max(last_imported)', 'last_imported');
+    if ( $result = $query->execute() ) {
+        $row = $result->fetchField(0 );
+        return $row;
+    }
+    return null;
+}
+
+
+/**
+ * Implements hook_batch_alter().
+ */
+function store_locator_import_batch_alter(&$batch)
+{
+    /* here we set a new function to call at the end of the migration batches */
+    foreach ( $batch['sets'] as &$set ) {
+        if ( is_string($set['finished']) && strpos($set['finished'], 'MigrateBatchExecutable' )) {
+            $set['finished'] = '\Drupal\store_locator_import\Batch\StoreLocatorMigrateBatchExecutable::batchFinishedImport';
+        }
+    }
+}

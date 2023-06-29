@@ -1,0 +1,5 @@
+#views-form-vista-store-attachment-1 {display: none!important}
+.toggle-map-button {display:none!important}
+.layout-container .views-element-container .views-element-container{display: none!important}
+.layout-container .views-exposed-form + .views-form form,
+.layout-container .views-exposed-form {max-width:100%!important}

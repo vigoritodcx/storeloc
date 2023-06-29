@@ -1,0 +1,16 @@
+store locator export:
+  title: 'Access to export stores'
+store locator export all:
+  title: 'Export all stores'
+store locator export local:
+  title: 'Export stores of associated countries'
+store locator import:
+  title: 'Access to import'
+store locator import all:
+  title: 'Import all stores'
+store locator import local:
+  title: 'Import stores of associated countries'
+store locator sync sap:
+  title: 'Sync stores from SAP'
+access store locator import setting:
+  title: 'Access to store locator configuration'

@@ -1,0 +1,39 @@
+services:
+  store_locator_import.service.usercountry:
+    class: Drupal\store_locator_import\Service\UserCountryService
+  store_locator_import.service.ap-ws-client:
+    class: Drupal\store_locator_import\Service\ApCrmService
+    arguments: ['@config.factory', '@http_client']
+  store_locator_import.service.migration-batch:
+    class: Drupal\store_locator_import\Service\ApgWsBatchMigrateService
+    arguments: ['@plugin.manager.migration']
+
+  store_locator_import.path_processor.store_path:
+    class: Drupal\store_locator_import\Processor\StoreImportPathProcessor
+    tags:
+      - { name: path_processor_inbound, priority: 250 }
+  store_locator_import.service.import:
+    class: Drupal\store_locator_import\Service\ImportService
+    arguments: ['@entity_type.manager', '@entity_field.manager', '@plugin.manager.importer']
+  store_locator_import.subscriber.handle_request:
+    class: Drupal\store_locator_import\EventSubscriber\HandleStoreImportRequest
+    tags:
+      - { name: event_subscriber }
+  store_locator_import.channel.logger:
+    parent: logger.channel_base
+    arguments: ['Store locator import']
+  store_locator_import.service.xml_handler:
+    class: Drupal\store_locator_import\Service\XmlHandler
+    arguments: ['@store_locator_import.channel.logger', '@store_locator_import.service.ap-ws-client', '@database', '@current_user']
+  store_locator_import.subscriber.track_last_imported:
+    class: Drupal\store_locator_import\EventSubscriber\TrackLastImported
+    arguments: []
+    tags:
+      - { name: event_subscriber }
+  store_locator_import.service.last_sync:
+    class: Drupal\store_locator_import\Service\LastSync
+    arguments: ['@config.factory']
+  store_locator_import.route_subscriber:
+    class: Drupal\store_locator_import\Routing\RouteSubscriber
+    tags:
+      - { name: event_subscriber }

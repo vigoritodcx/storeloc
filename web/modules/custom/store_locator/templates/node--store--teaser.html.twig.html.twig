@@ -1,0 +1,15 @@
+
+
+<article{{ attributes }}>
+
+  {{ title_prefix }}
+  {% if not page %}
+      {{ node_link }}
+  {% endif %}
+  {{ title_suffix }}
+
+  <div{{ content_attributes }}>
+    {{ content }}
+  </div>
+
+</article>

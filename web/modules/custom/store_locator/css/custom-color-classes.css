@@ -1,0 +1,16 @@
+.views-exposed-form .form-autocomplete,
+.views-exposed-form .form-submit:hover,
+.layout-container .views-exposed-form .view-form-search-map,
+.views-form li a,
+.toggle-map-button, .toggle-map-button:hover, .toggle-map-button:focus,
+.marker-link { color: #ab1a2b; } /* il rosso */
+
+.toggle-map-button, .toggle-map-button:hover, .toggle-map-button:focus { border-color: #ab1a2b; } /* il rosso */
+
+
+
+
+
+.views-form li { background-color: #ededed; } /* il grigio */
+
+.views-exposed-form label { color: #000000; } /* il nero di label */

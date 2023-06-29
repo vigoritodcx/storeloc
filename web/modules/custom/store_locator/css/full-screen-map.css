@@ -1,0 +1,10 @@
+form[data-drupal-selector="views-exposed-form-vista-store-page-1"]{display:none!important}
+form[data-drupal-selector="views-form-vista-store-page-1"]{display:none!important}
+.layout-container .views-element-container .views-element-container {width: 100%!important}
+.layout-container .geolocation-common-map-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100vh !important;
+}
+.geolocation-common-map{opacity: 1!important}

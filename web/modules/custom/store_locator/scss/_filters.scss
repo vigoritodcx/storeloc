@@ -1,0 +1,241 @@
+.views-exposed-form {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	max-width: 400px;
+        
+        &.active-posizione .form-actions{
+          display: none;
+        }
+
+	@include above($tablet) {
+		margin-bottom: 50px;
+	}
+
+
+	font-family: $font-family-sans-serif;
+
+	img {
+		order: -1;
+		height: auto;
+		max-width: 150px;
+	}
+
+	label {
+		display: block;
+		margin-bottom: 10px;
+	}
+
+	.form-item {
+		width: 100%;
+		margin-bottom: 30px;
+		&.form-item-title,
+		&.form-item-geolocation-geocoder-google-geocoding-api {
+			width: 80%;
+		}
+	}
+	&.active-geolocation_geocoder_google_geocoding_api {
+		.form-item-geolocation-geocoder-google-geocoding-api{
+			display: block;
+		}
+	}
+	&.active-title {
+		.form-item-title {
+			display: block;
+		}
+	}
+	.form-select,
+	.form-text,
+	.form-autocomplete {
+		width: 100%;
+		padding: 5px 10px;
+
+		border: 1px solid $color-borders;
+		border-radius: 4px;
+
+		box-shadow: inset 0 1px 1px rgba(0,0,0,.075);
+	}
+	.form-actions{
+		display: inline-block;
+		width: 20%;
+		text-align: center;
+		margin-top: 21px;
+		margin-bottom: 30px;
+
+	}
+
+	.form-submit {
+		@extend .btn;
+		@extend .btn-default;
+
+		text-transform: uppercase;
+
+		transition: all .15s ease-in-out;
+
+		&:hover {
+			background: #EDEDED;
+			color: #fff;
+		}
+	}
+
+	.toggle-buttons-wrapper{
+		margin-bottom: 2rem;
+		font-family: $font-family-sans-serif;
+		font-size: 14px;
+		legend {
+			display: none !important;
+		}
+		.form-item-toggler {
+			display: inline-block;
+			min-width: 60px;
+			width: auto;
+			margin-bottom: 0;
+                        img{
+                          height: 18px;
+                        }
+			input {
+				visibility: hidden;
+				position: absolute;
+			}
+			input[type="radio"]:checked+label{
+				color: #cc285a!important;
+				border-color: #cc285a!important;
+				background-color: #fff !important;
+			}
+			label {
+				text-transform: uppercase;
+				transition: all .15s ease-in-out;
+				border: solid 1px #dcdcdc;
+				color: #000;
+				background-color: #dcdcdc;
+				padding: 7.5px 10px;
+				border-radius: 4px;
+				text-decoration: none;
+				box-sizing: content-box;
+				text-align: center;
+				font-weight: normal;
+				&:hover{
+					cursor: pointer;
+					background-color: #000;
+					border-color: #000;
+					color: #fff;
+				}
+				&.active{
+					border-color: #000;
+					background-color: #fff;
+					color: #000;
+					cursor: default;
+					box-shadow: none;
+
+				}
+			}
+		}
+	}
+
+	.view-form-title {
+		display: inline-block;
+		font-size: 17px;
+		color: #6b6c6c !important;
+	}
+
+	.view-form-sub-title {
+		display: block;
+		width: 100%;
+
+		padding-top: 30px;
+		margin: 30px 0 50px;
+		border-top: 1px solid #eeeeee;
+
+		font-size: 17px;
+	}
+
+	.form-item-title,
+	.form-item-geolocation-geocoder-google-geocoding-api {
+		display: none;
+		&.active{
+			display: block;
+		}
+	}
+
+	@include below($mobile) {
+		.form-actions {
+			&, input { width: 100%; }
+		}
+	}
+
+	.view-form-search-map {
+		display: block;
+		width: 100%;
+		order: -1;
+
+		color: $color-red;
+
+		font-size: 22px;
+		font-weight: normal;
+		margin: 4px 0px;
+		text-transform: uppercase;
+	}
+
+	.fieldgroup {
+		legend {
+			display: block;
+			margin-bottom: 10px;
+
+			border-bottom: 0;
+
+			color: #888888;
+
+			font-size: 16px;
+			font-weight: 700;
+		}
+	}
+
+	.form-item {
+
+		label { margin-bottom: 0; }
+
+		input[type="checkbox"] {
+			margin-right: 5px;
+			margin-top: 0;
+			width: 15px;
+			height: 15px;
+
+			border-radius: 3px;
+			border: 1px solid #666666;
+
+			appearance: none;
+
+			&:checked {
+				background: #ffffff url($uri-check-mark) center center no-repeat;
+				background-size: 12px;
+			}
+		}
+	}
+	.fieldset-wrapper {
+		.form-checkboxes {
+			.form-item{
+				display: inline-block;
+				width: auto;
+				margin-right: 15px;
+				margin-bottom: 15px;
+				input {
+					display: inline-block;
+					width: 12px;
+					height: 12px;
+					margin-left: 0;
+				}
+				label {
+					display: inline-block;
+					color: #000;
+					font-weight: normal;
+					font-size: 14px;
+				}
+			}
+		}
+	}
+	.js-form-item-field-location-proximity{
+		/* this is required by drupal for filter*/
+		display: none;
+	}
+
+}

@@ -1,0 +1,743 @@
+<?php
+
+const FIELD_BRAND = 'field_brandid_target_id';
+const FIELD_COUNTRY = 'field_indirizzo_country_code';
+const FILED_PRODUCT = 'field_prodotto_target_id';
+const FIELD_TECH = 'field_apparecchiature_target_id';
+const FIELD_CIRCUITO = 'field_categoriacont_target_id';
+
+const LABEL_BRAND = 'filter-field_brandid_target_id';
+const LABEL_COUNTRY = 'filter-field_indirizzo_country_code';
+const LABEL_PRODUCT = 'filter-field_prodotto_target_id';
+const LABEL_LOCATION = 'geolocation_geocoder_google_geocoding_api';
+const LABEL_TITLE = 'filter-title';
+const LABEL_EQUIPMENT = 'filter-field_apparecchiature_target_id';
+const LABEL_CIRCUITO = 'filter-field_categoriacont_target_id';
+
+/**
+ * Implements hook_page_attachments_alter().
+ */
+function store_locator_page_attachments_alter(array &$attachments) {
+  $route = \Drupal::routeMatch()->getRouteObject();
+  if (!\Drupal::service('router.admin_context')->isAdminRoute($route)) {
+    $request = \Drupal::request();
+    $map_config = store_locator_get_map_config($request);
+    if ($map_config) {
+      $attachments['#attached']['library'][] = 'store_locator/store_locator.maps';
+
+      $match = [];
+      if (preg_match('/\/locator\/(\d*)/', $request->getRequestUri(), $match)) {
+        $attachments['#attached']['drupalSettings']['locator_config_id'] = $match[1];
+      }
+
+      if (array_key_exists('field_show_map', $map_config)) {
+        if (!$map_config['field_show_map']) {
+          $css = 'list'; // Map off
+        } elseif ($map_config['field_show_only_map']) {
+          $css = 'map'; // List screen
+        }
+        if (!empty($css)) {
+          $path = [
+              drupal_get_path('module', 'store_locator'),
+              'css',
+              'full-screen-' . $css . '.css',
+          ];
+          $attachments['#attached']['html_head_link'][][] = [
+              'rel' => 'stylesheet',
+              'href' => file_create_url(implode(DIRECTORY_SEPARATOR, $path)),
+              'type' => "text/css"
+          ];
+        }
+      }
+    }
+  }
+  /*
+    $map_config = store_locator_get_map_config(Drupal::request());
+    // if (c'è css esterno in map_config) {
+    $attachments['#attached']['html_head_link'][][] = [
+    'rel' => 'stylesheet',
+    //@TODO: inserire css
+    'href' => "https://use.fontawesome.com/releases/v5.1.0/css/all.css",
+    'type' => "text/css"
+    ];
+   */
+}
+
+/**
+ * Implements hook_views_pre_view().
+ */
+function store_locator_views_pre_view(\Drupal\views\ViewExecutable $view, $display_id, array &$args) {
+  if ($view->id() == 'vista_store') {
+    $request = $view->getRequest();
+
+    $map_config = store_locator_get_map_config($request);
+
+    if (!empty($map_config['customHeadItem'][0]['value'])) {
+      $view->element['#attached']['html_head']['custom_head_item'] = [
+          [
+              '#type' => 'template',
+              '#theme' => 'custom-head-item',
+              '#content' => $map_config['customHeadItem'][0]['value'],
+          ],
+          // A key, to make it possible to recognize this HTML  element when altering.
+          'custom_head_item',
+      ];
+    }
+
+    if ($view->current_display == 'attachment_1' && $map_config) {
+      $style = $view->getStyle();
+      if (!empty($map_config['mapStyle'][0]['value'])) {
+        $style->options['google_map_settings']['style'] = $map_config['mapStyle'][0]['value'];
+      }
+    }
+    if ($map_config) {
+      //@TODO: inclusione css della config
+      $filters = $view->display_handler->getOption('filters');
+      // Brand
+      if (!empty($filters[FIELD_BRAND])) {
+        $filters[FIELD_BRAND]['exposed'] = $map_config['brand']['visible'];
+        if ($request->get(FIELD_BRAND) == NULL) {
+          $filters[FIELD_BRAND]['value'] = $map_config['brand']['collections'];
+        }
+      }
+      // Prodotto
+      if (!empty($filters[FILED_PRODUCT])) {
+        $filters[FILED_PRODUCT]['exposed'] = $map_config['product']['visible'];
+        if ($request->get(FILED_PRODUCT) == NULL) {
+          $form[FILED_PRODUCT]['value'] = $map_config['product']['collections'];
+        }
+      }
+      // Apparecchiature
+      if (!empty($filters[FIELD_TECH])) {
+        $filters[FIELD_TECH]['exposed'] = $map_config['tech']['visible'];
+        if ($request->get(FIELD_TECH) == NULL) {
+          $filters[FIELD_TECH]['value'] = $map_config['tech']['collections'];
+        }
+      }
+      // Country
+      if (!empty($filters[FIELD_COUNTRY])) {
+        $filters[FIELD_COUNTRY]['exposed'] = $map_config['country']['visible'];
+        if ($request->get(FIELD_COUNTRY) == NULL) {
+          $filters[FIELD_COUNTRY]['value'] = $map_config['country']['collections'];
+        }
+      }
+      // Circuito Boutique
+      if (!empty($filters[FIELD_CIRCUITO])) {
+        $filters[FIELD_CIRCUITO]['exposed'] = $map_config['boutique']['visible'];
+        if ($request->get(FIELD_CIRCUITO) == NULL) {
+          $filters[FIELD_CIRCUITO]['value'] = $map_config['boutique']['collections'];
+        }
+      }
+
+      if (isset($filters["field_location_proximity"]["value"]["value"])) {
+        $filters["field_location_proximity"]["value"]["value"] = $map_config["map_range"];
+      }
+      $view->display_handler->overrideOption('filters', $filters);
+    }
+  }
+}
+
+/**
+ * Implements hook_views_pre_execute().
+ */
+function store_locator_views_pre_execute(\Drupal\views\ViewExecutable $view) {
+  if ($view->id() == 'vista_store') {
+    $map_config = store_locator_get_map_config($view->getRequest());
+    /*
+     * @TODO: Atenzione, questo rompe la search
+      if ($view->current_display == 'page_1' && !$map_config['field_show_map']) {
+      $view->attachment_after = [];
+      }
+     */
+    /* if ( $map_config ) {
+      $style = $view->getStyle();
+      if (!empty($map_config['mapStyle'][0]['value'])) {
+      $style->options['google_map_settings']['style'] = $map_config['mapStyle'][0]['value'];
+      }
+      } */
+    if ($view->current_display == 'attachment_1') {
+      if ($map_config) {
+        $style = $view->getStyle();
+        $style->options['google_map_settings']['info_auto_display'] = false;
+        $pins = ['pinSovrascrittura', 'pinRicaduta'];
+        $pin = NULL;
+        $pinBoutique = NULL;
+        foreach ($pins as $field) {
+          if (!empty($map_config[$field])) {
+            $pinfile_id = $map_config[$field][0]['target_id'];
+            $file = \Drupal\file\Entity\File::load($pinfile_id);
+            //@TODO: usare stili immagine drupal
+            $pin = file_create_url($file->getFileUri());
+            if ($field == 'pinSovrascrittura') {
+              $style->options['icon_field'] = NULL;
+              //@TODO: capire se va riscritto anche logo nella infoWindow oppure non ci va proprio
+            }
+            break;
+          }
+        }
+        if (!empty($map_config['pinBoutique'])) {
+            $pinboutiquefile_id = $map_config['pinBoutique'][0]['target_id'];
+            $fileboutique = \Drupal\file\Entity\File::load($pinboutiquefile_id);
+            $pinBoutique = file_create_url($fileboutique->getFileUri());
+        } else {
+            $pinBoutique = $pin;
+        }
+        if ($pin) {
+          $style->options['google_map_settings']['marker_icon_path'] = $pin;
+        }
+        if ($pinBoutique) {
+            //Gestito tramite patch del geolocation module
+            $style->options['google_map_settings']['marker_icon_path_boutique'] = $pinBoutique;
+        }
+        //@TODO: aggiuhta altre eventuali configurazioni mappa
+
+        /* if (!empty($map_config['mapStyle'][0]['value'])) {
+          $style->options['google_map_settings']['style'] = $map_config['mapStyle'][0]['value'];
+          } */
+      }
+    }
+  }
+}
+
+/**
+ * Implements hook_views_post_render().
+ */
+function store_locator_views_post_render(\Drupal\views\ViewExecutable $view, &$output, \Drupal\views\Plugin\views\cache\CachePluginBase $cache) {
+  if ($view->id() == 'vista_store') {
+    if ($view->current_display == 'page_1') {
+      $class_name = 'store-locator';
+    } elseif ($view->current_display == 'attachment_1') {
+      $class_name = 'store-locator-map';
+      $request = $view->getRequest();
+      $map_config = store_locator_get_map_config($request);
+      if ($map_config) {
+        $output['#attached']['drupalSettings']['store_locator']['mapconfig'] = $map_config;
+        /** @TODO: in caso vad aggiunto qualcosa AL JS
+         * $output['#attached']['drupalSettings']['store_locator']['markers'] = [];
+         * foreach ($view->result as $item) {
+         * $output['#attached']['drupalSettings']['store_locator']['markers'][$item->index] = [
+         * //@TODO: completare codice
+         * 'nid' => $item->nid,
+         * 'marker' => 'prendi il field dalla vista e usa lo stesso fatto in web/modules/custom/store_locator/store_locator.module:70',
+         * ];
+         * }
+         */
+      }
+    }
+    if (isset($class_name) && $class_name) {
+      $output['#prefix'] = '<div class="' . $class_name . '">';
+      $output['#suffix'] = '</div>';
+    }
+  }
+}
+
+/*
+ * hook_views_pre_render
+ */
+
+function store_locator_views_pre_render(\Drupal\views\ViewExecutable $view) {
+  //\Drupal::logger('store_locator_views_pre_render')->notice('OK: <pre>@val</pre>', ['@val' => $bollino]);
+
+  if ($view->id() == "vista_store" && $view->current_display === 'page_1') {
+
+    $request = \Drupal::request();
+    $map_config = store_locator_get_map_config($request);
+
+    //ciclo tutti i risultati
+    foreach ($view->result as $value) {
+      $bolliniDaMostrare = [];
+      //se il parametro è passato vuol dire che la map_config richiede di far vedere soltanto i bollini indicati
+      if (isset($map_config['logo_circuito_boutique'])) {
+        //field_categoriacont è il field bollini di store
+        $bolliniDiStore = buildTermReferenceToArray($value->_entity->get('field_categoriacont')->getValue());
+        if ($bolliniDiStore) {
+
+          foreach ($bolliniDiStore as $k => $bollino) {
+            //se il bollino dello store è nell'elenco dei bollini che la mappa accetta di far vedere
+            if (in_array($bollino, $map_config['logo_circuito_boutique'])) {
+              $bolliniDaMostrare[] = ['target_id' => $bollino];
+            }
+          }
+
+          $value->_entity->set('field_categoriacont', $bolliniDaMostrare);
+        }
+      } else {
+        //se il parametro NON è passato NON mostro alcun bollino
+        $value->_entity->set('field_categoriacont', null);
+      }
+    }
+  }
+    if ($view->id() == "vista_store" && $view->current_display === 'attachment_1') {
+        $request = \Drupal::request();
+        $map_config = store_locator_get_map_config($request);
+        $pinBoutique = $map_config['pinBoutique'];
+        if ($pinBoutique) {
+            foreach ($view->result as $value) {
+                $boutiqueCategory = buildTermReferenceToArray($value->_entity->get('field_categoriacont')->getValue());
+                if ($boutiqueCategory) {
+
+                }
+                //Drupal::logger('mappin')->info(print_r($value));
+            }
+        }
+    }
+}
+
+/**
+ * Implements hook_theme().
+ */
+function store_locator_theme($existing, $type, $theme, $path) {
+  return [
+      'maps_display' => [
+          'variables' => ['events' => NULL],
+          'template' => 'map-main-list',
+      ],
+      'node' => [
+          'template' => 'node--store--teaser.html.twig',
+          'base hook' => 'node',
+      ],
+      'custom-head-item' => [
+          'template' => 'custom-head-item',
+          'variables' => [
+              'content' => null,
+          ]
+      ],
+  ];
+}
+
+/**
+ * Implements hook_form_BASE_FORM_ID_alter().
+ */
+function store_locator_form_views_exposed_form_alter(&$form, \Drupal\Core\Form\FormStateInterface $form_state, $form_id) {
+  if ($form['#id'] == 'views-exposed-form-vista-store-page-1') {
+    //$view = $form_state->getStorage()['view'];
+    //$request = $view->getRequest();
+    $request = \Drupal::request();
+    $map_config = store_locator_get_map_config($request);
+
+    //$form['btn_toggle_map'] = ['#type' => 'html_tag','#tag' => 'input','#attributes' => ['class' => ['btn','btn-default','toggle-map-button',],'type' => 'button','value' => '<span>test1</span>',],'#weight' => 100];
+
+    $form[] = array(
+        '#markup' => '<span class="btn btn-default toggle-map-button"><span class="map fal fa-map"></span><span class="list fal fa-list"></span></span>',
+        '#weight' => 110,
+    );
+
+    $toggle_inputs = array($form['geolocation_geocoder_google_geocoding_api']['#description']);
+
+    if (isset($form['title'])) {
+      $toggle_inputs['title'] = 'form-item-title';
+      $form['title']['#weight'] = -95;
+      $form['title']['#attributes'] = [
+          'id' => $toggle_inputs['title'],
+          'class' => ['toggle-input'],
+      ];
+    }
+
+    if (isset($form['geolocation_geocoder_google_geocoding_api'])) {
+
+      //Handle geolocation filter based on counrty selected in mapconfig.
+      if (!empty($map_config['autocompleteFilter'])) {
+        $form['geolocation_geocoder_google_geocoding_api']['#attached']['drupalSettings']['geolocation']['geocoder']['googleGeocodingAPI']['components']['country'] = $map_config['autocompleteFilter'][0]['value'];
+      }
+      $toggle_inputs['address'] = 'form-item-geolocation-geocoder-google-geocoding-api';
+      $form['geolocation_geocoder_google_geocoding_api']['#weight'] = -94;
+      $form['geolocation_geocoder_google_geocoding_api']['#attributes']['id'] = $toggle_inputs['address'];
+      $form['geolocation_geocoder_google_geocoding_api']['#attributes']['class'][] = 'toggle-input';
+      if (isset($form['geolocation_geocoder_google_geocoding_api']['#description'])) {
+        unset($form['geolocation_geocoder_google_geocoding_api']['#description']);
+      }
+    }
+
+    if (isset($form['actions'])) {
+      $form['actions']['#weight'] = -93;
+    }
+
+
+    if (!empty($map_config)) {
+
+      // Intestazione form
+      if (array_key_exists('searchTitle', $map_config)) {
+        $form[] = array(
+            '#markup' => '<span class="view-form-search-map">' . $map_config['searchTitle'] . '</span>',
+            '#weight' => -110,
+        );
+      }
+
+      if (array_key_exists('mapTitle', $map_config)) {
+        $form[] = array(
+            '#markup' => '<span class="view-form-title">' . $map_config['mapTitle'] . '</span>',
+            '#weight' => -100,
+        );
+      }
+      if (array_key_exists('headerImage', $map_config)) {
+        $form[] = array(
+            '#markup' => '<img src="' . $map_config['headerImage']['url'] . '" alt="' . $map_config['headerImage']['alt'] . '" />',
+            '#weight' => -98,
+        );
+      }
+
+      if (array_key_exists('mapSubtitle', $map_config)) {
+        $form[] = array(
+            '#markup' => '<span class="view-form-sub-title">' . $map_config['mapSubtitle'] . '</span>',
+            '#weight' => -97,
+        );
+      }
+
+      //print_r($map_config);die;
+
+      stl_add_toggler($form, $form_state, $form_id);
+
+      //se il parametro non c'è o non è true (1) unsetto il parametro nel toggle della mappa
+      if (!isset($map_config['show_geolocation_button']) || $map_config['show_geolocation_button'] != 1) {
+        unset($form['toggler']['#options']['posizione']);
+      }
+
+
+      $current_path = $request->getBasePath() . $request->getPathInfo();
+      $form["#action"] = $current_path;
+
+      // Brand
+      if (!empty($form[FIELD_BRAND]) && count($map_config['brand']['collections']) > 0) {
+        buildFieldOptions($map_config['brand']['collections'], $form, FIELD_BRAND);
+      }
+      // Prodotto
+      if (!empty($form[FILED_PRODUCT]) && count($map_config['product']['collections']) > 0) {
+        buildFieldOptionsDropDown($map_config['product']['collections'], $form, FILED_PRODUCT);
+      }
+      // Apparecchiature
+      if (!empty($form[FIELD_TECH]) && count($map_config['tech']['collections']) > 0) {
+        buildFieldOptionsDropDown($map_config['tech']['collections'], $form, FIELD_TECH);
+      }
+      // Country
+      if (!empty($form[FIELD_COUNTRY]) && count($map_config['country']['collections']) > 0) {
+        buildFieldOptionsDropDown($map_config['country']['collections'], $form, FIELD_COUNTRY);
+      }
+      // Circuito Boutique
+      if (!empty($form[FIELD_CIRCUITO]) && count($map_config['boutique']['collections']) > 0) {
+        buildFieldOptionsDropDown($map_config['boutique']['collections'], $form, FIELD_CIRCUITO);
+      }
+
+      // Modifica etichette campi
+      if (array_key_exists('brandLabel', $map_config) && $map_config['brandLabel'] != "") {
+        $form['#info'][LABEL_BRAND]['label'] = $map_config['brandLabel'];
+      }
+
+      if (array_key_exists('countryLabel', $map_config) && $map_config['countryLabel'] != "") {
+        $form['#info'][LABEL_COUNTRY]['label'] = $map_config['countryLabel'];
+      }
+
+      if (array_key_exists('productLabel', $map_config) && $map_config['productLabel'] != "") {
+        $form['#info'][LABEL_PRODUCT]['label'] = $map_config['productLabel'];
+      }
+
+      if (array_key_exists('locationLabel', $map_config) && $map_config['locationLabel'] != "") {
+        $form[LABEL_LOCATION]['#title'] = $map_config['locationLabel'];
+      }
+
+      if (array_key_exists('titleLabel', $map_config) && $map_config['titleLabel'] != "") {
+        $form['#info'][LABEL_TITLE]['label'] = $map_config['titleLabel'];
+      }
+
+      if (array_key_exists('equipmentLabel', $map_config) && $map_config['equipmentLabel'] != "") {
+        $form['#info'][LABEL_EQUIPMENT]['label'] = $map_config['equipmentLabel'];
+      }
+
+      if (array_key_exists('boutiqueLabel', $map_config) && $map_config['boutiqueLabel'] != "") {
+        $form['#info'][LABEL_CIRCUITO]['label'] = $map_config['boutiqueLabel'];
+      }
+
+      // Testo bottone ricerca
+      if (array_key_exists('buttonSearch', $map_config)) {
+        $form['actions']['submit']['#value'] = $map_config['buttonSearch'];
+      }
+
+      // Colore testo principale
+      if (array_key_exists('mainColor', $map_config)) {
+        $mainColor = $map_config['mainColor'];
+        $form['#attached']['html_head'][] = [
+            [
+                '#tag' => 'style',
+                '#value' => '
+                        .layout-container .views-exposed-form .form-toggle-button.active { color: ' . $mainColor . '!important; border-color:' . $mainColor . '!important; background-color: #fff !important; }
+
+                        .layout-container .views-exposed-form .view-form-search-map,
+                        .layout-container .marker-link,
+                        .layout-container .views-exposed-form label { color: ' . $mainColor . '; }
+
+                        .layout-container .toggle-buttons-wrapper label:hover,
+                        .layout-container .form-submit:hover { color: #fff !important; background-color: ' . $mainColor . '!important; border-color:' . $mainColor . '!important; }',
+            ],
+            'store_locator_main_color'
+        ];
+      }
+      // Colore testo secondario
+      if (array_key_exists('secondaryColor', $map_config) && true) {
+        $secondaryColor = $map_config['secondaryColor'];
+        $form['#attached']['html_head'][] = [
+            [
+                '#tag' => 'style',
+                '#value' => '
+                        .layout-container .views-exposed-form .form-toggle-button.active { background-color: ' . $secondaryColor . ' !important; color: #fff !important; }
+                        .layout-container .store-locator .views-exposed-form .toggle-buttons-wrapper .form-toggle-button { background-color: #fff; }',
+            ],
+            'store_locator_secondary_color'
+        ];
+      }
+
+      if (array_key_exists('mapExtraCode', $map_config)) {
+        $mapExtraCode = $map_config['mapExtraCode'];
+        $form['#attached']['html_head'][] = [
+            [
+                '#tag' => 'style',
+                '#value' => $mapExtraCode,
+            ],
+            'store_locator_extra'
+        ];
+      }
+    }
+  }
+}
+
+function stl_add_toggler(&$form, \Drupal\Core\Form\FormStateInterface $form_state, $form_id) {
+  global $base_url;
+
+  /* here we add a checkbox element to the form to be used as a toggler for the fields address and title */
+  $user_input = $form_state->getUserInput();
+  /* here we get the the user input because when the form is submitted the entire form is replaced
+    with ajax and this field will be used to remember the last selection */
+  $active_selection = (isset($user_input['toggler'])) ? $user_input['toggler'] : 'geolocation_geocoder_google_geocoding_api';
+
+  /* here we add a class to the form so we can tell which element is active in the front end */
+  $form['#attributes']['class'][] = 'active-' . $active_selection;
+  $form['toggle_buttons'][$active_selection]['#attributes']['class'][] = 'active';
+
+  $iconaPosizione = $base_url . '/' . drupal_get_path('module', 'store_locator') . '/img/icon_geolocation-logo.png';
+
+  $form['toggler'] = [
+      '#type' => 'radios',
+      '#title' => 'toggler',
+      '#weight' => -96,
+      '#options' => [
+          'geolocation_geocoder_google_geocoding_api' => t('LOCALITÀ'),
+          'title' => t('NOME'),
+          'posizione' => "<img src='$iconaPosizione'/>",
+      ],
+      '#attributes' => [
+          'class' => [
+              'toggle-buttons-wrapper'
+          ],
+      ],
+      '#default_value' => $active_selection,
+  ];
+}
+
+function store_locator_node_presave($node) {
+
+  if ($node->getType() == 'store') {
+    $selectMainBrand = $node->get('field_main_brandid')->getValue();
+    if ($selectMainBrand != null) {
+      $find = false;
+      $arrSelectedBrand = $node->get('field_brandid')->getValue();
+
+      foreach ($arrSelectedBrand as $item) {
+        if ($item == $selectMainBrand[0])
+          $find = true;
+      }
+      if (!$find) {
+        array_push($arrSelectedBrand, $selectMainBrand[0]);
+        $node->field_brandid = $arrSelectedBrand;
+      }
+    }
+  }
+}
+
+/**
+ * Implements hook_ENTITY_TYPE_insert().
+ */
+function store_locator_node_insert(Drupal\Core\Entity\EntityInterface $entity) {
+  sl_fix_coordinates_distance($entity);
+}
+
+/**
+ * Implements hook_ENTITY_TYPE_update().
+ */
+function store_locator_node_update(Drupal\Core\Entity\EntityInterface $entity) {
+  sl_fix_coordinates_distance($entity);
+}
+
+/**
+ * @param \Drupal\Core\Entity\EntityInterface $entity
+ * @param $subfield
+ * @param $olocation
+ *
+ * @return mixed|string
+ */
+function sl_fix_coordinates_distance(Drupal\Core\Entity\EntityInterface $entity) {
+  $subfield = null;
+  if ($entity->bundle() == 'store') {
+
+    //fix for Geolocation Module when using Proximity filter
+    $field_name = 'field_location';
+    $subfields = ['lat_sin', 'lat_cos', 'lng_rad'];
+    foreach ($subfields as &$subfield) {
+      $subfield = $field_name . '_' . $subfield;
+    }
+    if (!$entity->get($field_name)->isEmpty()) {
+      $olocation = [];
+      foreach ($entity->get($field_name)->getValue() as $delta => $location) {
+        if (is_null($location['lat_sin'])) {
+          $olocation[$subfields[0]] = sin(deg2rad($location['lat']));
+          $olocation[$subfields[1]] = cos(deg2rad($location['lat']));
+          $olocation[$subfields[2]] = deg2rad($location['lng']);
+          \Drupal::database()->update('node__' . $field_name)
+                  ->condition('bundle', $entity->bundle())
+                  ->condition('entity_id', $entity->id())
+                  ->condition('delta', $delta)
+                  ->fields($olocation)
+                  ->execute();
+        }
+      }
+    }
+  }
+  return $subfield;
+}
+
+function buildFieldOptions($collections, &$form, $fieldName) {
+  $options = $form[$fieldName]['#options'];
+  //var_dump($options);
+  //die;
+  $arrTemp = [];
+  foreach ($options as $option) {
+    $val = key($option->option);
+
+    if (in_array($val, $collections)) {
+      $arrTemp[] = $option;
+    }
+  }
+  $form[$fieldName]['#options'] = $arrTemp;
+}
+
+function buildFieldOptionsDropDown($collections, &$form, $fieldName) {
+  $options = $form[$fieldName]['#options'];
+  $arrTemp = [];
+  foreach ($options as $key => $value) {
+    if (in_array($key, $collections)) {
+      $arrTemp[$key] = $value;
+    }
+  }
+  $form[$fieldName]['#options'] = $arrTemp;
+}
+
+function buildTermReferenceToArray($termsArray) {
+  $arrReturn = [];
+  foreach ($termsArray as $item) {
+    array_push($arrReturn, $item['target_id']);
+  }
+  return $arrReturn;
+}
+
+function store_locator_get_map_config(\Symfony\Component\HttpFoundation\Request $request) {
+  return drupal_static('store_locator_map_config');
+}
+
+/**
+ * Implements hook_preprocess_node().
+ */
+function store_locator_preprocess_node(&$variables) {
+  /** @var Drupal\node\Entity\Node $map_config_node */
+  /** @var \Drupal\Core\Url $url */
+  $map_config_node = $variables['node'];
+
+  switch ($map_config_node->getType()) {
+    case 'mapconfig':
+      $url = \Drupal::request()->getSchemeAndHttpHost() . base_path() . 'locator/' . $map_config_node->id();
+      $variables['content']['map_url'] = [
+          '#prefix' => '<p>To view this item click <a href="' . $url . '" target="_blank">here</a></p>',
+          '#suffix' => '<p>To use this map in your website, include this code:  <code>&lt;iframe src="' . $url . '"&gt;&lt;/iframe&gt;</code>'
+      ];
+      break;
+    case 'store':
+      if ($variables['view_mode'] === 'teaser') {
+        $build = [
+            '#type' => 'html_tag',
+            '#tag' => 'a',
+            '#value' => $variables['label'][0]['#context']['value'],
+            '#attributes' => [
+                'href' => '#',
+                'class' => 'marker-link',
+                'data-lat' => $variables['content']['field_location'][0]['#lat'],
+                'data-lng' => $variables['content']['field_location'][0]['#lng'],
+            ],
+        ];
+        unset($variables['content']['field_location']);
+        $variables['node_link'] = $build;
+      }
+      /*
+        if ($variables['view_mode'] === 'full') {
+        //print_r($variables); die;
+        //\Drupal::logger('store_locator_preprocess_node')->error('node: @val', ['@val' => print_r(array_keys($variables['content']), true)]);
+        $current_path = \Drupal::service('path.current')->getPath();
+        $result = \Drupal::service('path.alias_manager')->getAliasByPath($current_path);
+
+        \Drupal::logger('store_locator_preprocess_node')->error('node: @val', ['@val' =>
+        print_r([$current_path,$result], true)
+        ]);
+        //unset($variables['content']['field_categoriacont']);
+        } */
+      break;
+  }
+}
+
+/**
+ * Implements hook_preprocess_HOOK().
+ */
+function store_locator_preprocess_field(&$variables) {
+  if ($variables['entity_type'] === 'node') {
+    if ($variables['element']['#bundle'] === 'store' && $variables['element']['#view_mode'] === 'teaser') {
+      $variables['attributes']['class'][] = $variables['field_name'];
+    }
+  }
+}
+
+/**
+ * Implements hook_views_query_alter().
+ */
+function store_locator_views_query_alter($view, $query) {
+  $test = 'hello';
+}
+
+/**
+ * Implementation of hook_views_pre_build().
+ * Code to handle item per page.
+ */
+function store_locator_views_pre_build(Drupal\views\ViewExecutable $view) {
+
+  if ($view->id() == 'store_search' && $view->current_display == 'rest_export_1') {
+    $post_req = \Drupal::request()->query->all();
+
+    //Remove query paramter for which there is no value.
+    foreach ($post_req as $key => $value) {
+      if (empty($value)) {
+        $view->getRequest()->query->remove($key);
+      }
+    }
+
+    //Implementation of item per page.
+    if (!empty($post_req['limit'])) {
+      $limit = (int) $post_req['limit'];
+      if ($limit >= 0) {
+        $view->setItemsPerPage($limit);
+      }
+    }
+  }
+}
+
+//@todo: aaa1. creare funzione che crea variabile drupal ajax
+//@todo: aaa2. NEL JAVASCRIPT di DRUPAL: (beforeSend) prima del submit, popola queste variabili e aggiungile al GET
+/*
+ Drupal.Ajax.prototype.beforeSend = function (xmlhttprequest, options) {
+    // se c'è variabile che ci interessa aggiungiamo a url e il resto della funzione è uguale
+    options.url = options.url + '&src=' + window.location.pathname
+    alert(options.url);
+ }
+ */

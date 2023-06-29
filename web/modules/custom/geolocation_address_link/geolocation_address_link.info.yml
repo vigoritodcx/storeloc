@@ -1,0 +1,10 @@
+name: Geolocation Address Link
+type: module
+description: Update Geolocation fields from Address fields.
+core: 8.x
+core_version_requirement: ^8 || ^9 || ^10
+package: Geolocation
+dependencies:
+  - address:address
+  - geolocation:geolocation(<8.x-2.x)
+configure: geolocation_add ress_link.settings
